@@ -17,7 +17,7 @@
     "next-themes": "^0.4.6",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-dropzone": "^15.0.0",
+    "react-dropzone": "^19.1.1",
     "tone": "^15.1.22",
     "uuid": "^14.0.0"
   },
