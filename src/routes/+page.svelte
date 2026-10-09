@@ -6,6 +6,7 @@
   import Player from "../lib/components/Player.svelte";
   import ThemeToggle from "../lib/components/ThemeToggle.svelte";
   import type { ColorChoice } from "../lib/extraction";
+  import type { FitDraft, FitOptions } from "../lib/fit";
   import { convert } from "../lib/image";
   import type { NoteConversion } from "../lib/notes";
   import type { OrderMethod } from "../lib/order";
@@ -13,18 +14,45 @@
   import type { RegionMethod } from "../lib/regions";
   import { meanKeyTempo, type TempoMethod } from "../lib/tempo";
   import { getImageData } from "../lib/utils";
-  import type { Chord } from "../lib/worker-interface";
+  import type { Chord, NoteLength } from "../lib/worker-interface";
 
   let tempoMethod = $state<TempoMethod>("mean-key");
   let bpm = $state<number | null>(80);
   let duration = $state<number | null>(30); // how long should this range be?
-  let region = $state<RegionMethod>("grid");
-  let orderMethod = $state<OrderMethod>("word");
-  let colorChoice = $state<ColorChoice>("proportional");
+  let region = $state<RegionMethod>("bisect");
+  let orderMethod = $state<OrderMethod>("path");
+  let colorChoice = $state<ColorChoice>("new");
   let minStd = $state<number | null>(0.04);
   let noteMethod = $state<NoteConversion>("hslc");
+  // penalties are in semitones of movement: moving a whole chord's weight one
+  // semitone against its hue costs 1
+  let fit = $state<FitDraft>({
+    keyFit: "one",
+    mode: "any",
+    offKey: 4,
+    drop: 3,
+    register: 0.5,
+    clash: 1,
+    triad: 0.5,
+    progression: 0.2,
+    parallel: 0.5,
+    leap: 0.5,
+    movement: 0.1,
+    ending: 1,
+    mud: 1,
+    root: 0.2,
+    minorFifth: 0.5,
+    leading: 1,
+    phrase: 8,
+    cadence: 1,
+    keyChange: 3,
+  });
   let refineMethod = $state<RefineMethod>("trim");
-  let minWeight = $state<number | null>(0.05);
+  let minWeight = $state<number | null>(0.02);
+  let surround = $state<number | null>(0.5);
+  let noteLength = $state<NoteLength>("area");
+  let hold = $state<"hold" | "strike">("hold");
+  let fill = $state<"off" | "on">("off");
   let maxNotes = $state<number | null>(4);
   let image = $state<string | null>(null);
   let imgdata = $state.raw<ImageData | null>(null);
@@ -110,6 +138,8 @@
       minWeight !== null &&
       maxNotes !== null &&
       minStd !== null &&
+      surround !== null &&
+      fitOptions !== null &&
       (tempoMethod === "manual" || !extracting)
     ) {
       const img = imgdata;
@@ -124,6 +154,10 @@
         refineMethod,
         minWeight,
         maxNotes,
+        surround,
+        noteLength,
+        fill: fill === "on",
+        fit: fitOptions,
       };
       const controller = new AbortController();
       processing = true;
@@ -151,6 +185,14 @@
         controller.abort();
       };
     }
+  });
+
+  // null while any penalty field is empty or out of range
+  const fitOptions = $derived.by((): FitOptions | null => {
+    const snapshot = $state.snapshot(fit);
+    return Object.values(snapshot).includes(null)
+      ? null
+      : (snapshot as FitOptions);
   });
 
   const progress = $derived(
@@ -217,6 +259,11 @@
       bind:refineMethod
       bind:minWeight
       bind:maxNotes
+      bind:surround
+      bind:noteLength
+      bind:hold
+      bind:fill
+      bind:fit
       bind:playing
       {processing}
       {ready}
@@ -255,6 +302,7 @@
     {song}
     bind:playing
     bind:ready
+    hold={hold === "hold"}
     onerror={(message) => {
       error = message;
     }}

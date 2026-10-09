@@ -87,3 +87,15 @@ test("a single region is returned as-is for every method", () => {
     expect(order([solo], method)).toEqual([solo]);
   }
 });
+
+test("path order visits a grid without long jumps", () => {
+  const items = grid(5, 6, 0, 0);
+  const ordered = order(items, "path");
+  expect(sortedCenters(ordered)).toEqual(sortedCenters(items));
+  expect(ordered[0].center).toEqual([0, 0]);
+  for (let index = 1; index < ordered.length; ++index) {
+    const [fromX, fromY] = ordered[index - 1].center;
+    const [toX, toY] = ordered[index].center;
+    expect(Math.hypot(toX - fromX, toY - fromY)).toBeLessThan(1.5);
+  }
+});
