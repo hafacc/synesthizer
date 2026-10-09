@@ -49,11 +49,6 @@ export interface FitOptions {
   keyChange: number;
 }
 
-/** fit options while being edited, when a number field may be empty */
-export type FitDraft = { keyFit: KeyFit; mode: KeyMode } & {
-  [Name in Exclude<keyof FitOptions, "keyFit" | "mode">]: number | null;
-};
-
 /** a major or natural minor key */
 export interface Key {
   /** pitch class of the home note */
@@ -159,6 +154,14 @@ const epsilon = 1e-9;
 const keys: Key[] = [false, true].flatMap((minor) =>
   orderedNotes.map((_, tonic) => ({ tonic, minor })),
 );
+
+/** whether a key's signature is written with sharps rather than flats */
+export function sharpKey({ tonic, minor }: Key): boolean {
+  // steps clockwise around the circle of fifths from C major; 1 to 5 are the
+  // sharp keys, and 6 could go either way so it stays with flats
+  const steps = (((minor ? tonic + 3 : tonic) % 12) * 7) % 12;
+  return steps >= 1 && steps <= 5;
+}
 
 /** name of a key, like "Ab minor" */
 export function keyName({ tonic, minor }: Key): string {

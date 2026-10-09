@@ -1,7 +1,7 @@
 import { v4 as uuid } from "uuid";
 import { type HSLC, hslc2rgb, rgb2hex, rgb2hslc } from "./colors";
 import { extract } from "./extraction";
-import { fit, keyName, place } from "./fit";
+import { fit, keyName, place, sharpKey } from "./fit";
 import { color2note, midi2note, note2midi } from "./notes";
 import { order } from "./order";
 import { lightness2height, type RawNote, summarize } from "./raw";
@@ -17,7 +17,10 @@ const minVelocity = 0.3;
 // fill notes stay at or above C3, clear of the range where close notes blur
 const fillFloor = 48;
 
-type Sound = Pick<Chord, "notes" | "soft" | "velocity" | "key" | "color">;
+type Sound = Pick<
+  Chord,
+  "notes" | "soft" | "velocity" | "key" | "sharps" | "color"
+>;
 
 /** what one region asks for before the song is fitted to a key */
 interface Reading {
@@ -33,6 +36,7 @@ interface Reading {
 function oldReadings(
   ordered: readonly Region[],
   {
+    cycles,
     colorChoice,
     minStd,
     noteMethod,
@@ -41,8 +45,8 @@ function oldReadings(
     maxNotes,
   }: Message,
 ): Reading[] {
-  if (colorChoice === "new" || colorChoice === "new2") {
-    throw new Error("the new color selections have their own conversion");
+  if (colorChoice === "new") {
+    throw new Error("hue peaks have their own conversion");
   }
   const colors: string[] = [];
   const weightedNotes: [string, number][][] = [];
@@ -52,7 +56,7 @@ function oldReadings(
     // NOTE not currently using saturation / chroma
     const counts = new Map<string, { count: number; color: ArrayMean<HSLC> }>();
     for (const [color, count] of weighted) {
-      const [note, octave] = color2note(color, noteMethod);
+      const [note, octave] = color2note(color, noteMethod, cycles);
       const rep = `${note}${octave}`;
       let entry = counts.get(rep);
       if (entry === undefined) {
@@ -105,9 +109,8 @@ function oldReadings(
  */
 function newReadings(
   ordered: readonly Region[],
-  { img, colorChoice, minWeight, maxNotes, surround }: Message,
+  { img, cycles, minWeight, maxNotes, surround }: Message,
 ): Reading[] {
-  const cycles = colorChoice === "new2" ? 2 : 1;
   const summaries = ordered.map(({ colors, poly }) =>
     summarize(
       colors,
@@ -172,7 +175,14 @@ function* sounds(
         }
       }
     }
-    yield { notes: names, soft, velocity, key: key && keyName(key), color };
+    yield {
+      notes: names,
+      soft,
+      velocity,
+      key: key && keyName(key),
+      sharps: key !== null && sharpKey(key),
+      color,
+    };
   }
 }
 
@@ -223,7 +233,7 @@ addEventListener("message", (event: MessageEvent<Message>) => {
     // playback order is independent of how regions were carved
     const ordered = order(carved, orderMethod);
     const readings =
-      message.colorChoice === "new" || message.colorChoice === "new2"
+      message.colorChoice === "new"
         ? newReadings(ordered, message)
         : oldReadings(ordered, message);
 

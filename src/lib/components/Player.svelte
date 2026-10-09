@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Sampler } from "tone";
-  import { asset } from "$app/paths";
-  import { orderedNotes } from "../notes";
+  import { fade, sampleUrls } from "../samples";
+  import { softVelocity } from "../score";
   import type { Chord } from "../worker-interface";
 
   let {
@@ -20,9 +20,6 @@
     onerror: (message: string) => void;
   } = $props();
 
-  const octaves = [1, 2, 3, 4, 5, 6, 7] as const;
-  // how hard a chord's quiet notes are struck
-  const softVelocity = 0.25;
 
   let sampler = $state.raw<Sampler | null>(null);
   // index of the chord sounding now, and when it was due to start
@@ -42,14 +39,9 @@
   // mounting only happens in the browser, so the audio sampler is never
   // constructed during the static prerender
   onMount(() => {
-    const urls: Record<string, string> = {};
-    for (const note of orderedNotes) {
-      for (const octave of octaves) {
-        urls[`${note}${octave}`] = asset(`Piano.mf.${note}${octave}.mp3`);
-      }
-    }
     const next = new Sampler({
-      urls,
+      urls: sampleUrls(),
+      release: fade,
       onload: () => {
         ready = true;
       },

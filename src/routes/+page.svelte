@@ -1,63 +1,117 @@
 <script lang="ts">
+  import Download from "@lucide/svelte/icons/download";
+  import FileMusic from "@lucide/svelte/icons/file-music";
+  import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import Dropzone from "svelte-file-dropzone";
-  import { asset } from "$app/paths";
-  import Controls from "../lib/components/Controls.svelte";
-  import ImageRender from "../lib/components/ImageRender.svelte";
+  import { start } from "tone";
+  import HueCone from "../lib/components/HueCone.svelte";
+  import Mark from "../lib/components/Mark.svelte";
+  import Now from "../lib/components/Now.svelte";
   import Player from "../lib/components/Player.svelte";
+  import Settings from "../lib/components/Settings.svelte";
+  import SheetMusic from "../lib/components/SheetMusic.svelte";
+  import Stage from "../lib/components/Stage.svelte";
   import ThemeToggle from "../lib/components/ThemeToggle.svelte";
+  import Transport from "../lib/components/Transport.svelte";
   import type { ColorChoice } from "../lib/extraction";
-  import type { FitDraft, FitOptions } from "../lib/fit";
+  import type { FitOptions } from "../lib/fit";
   import { convert } from "../lib/image";
   import type { NoteConversion } from "../lib/notes";
   import type { OrderMethod } from "../lib/order";
   import type { RefineMethod } from "../lib/refine";
   import type { RegionMethod } from "../lib/regions";
-  import { meanKeyTempo, type TempoMethod } from "../lib/tempo";
-  import { getImageData } from "../lib/utils";
+  import { type TempoMethod, tempoOf } from "../lib/tempo";
+  import { getImageData, save } from "../lib/utils";
   import type { Chord, NoteLength } from "../lib/worker-interface";
 
-  let tempoMethod = $state<TempoMethod>("mean-key");
-  let bpm = $state<number | null>(80);
-  let duration = $state<number | null>(30); // how long should this range be?
-  let region = $state<RegionMethod>("bisect");
-  let orderMethod = $state<OrderMethod>("path");
-  let colorChoice = $state<ColorChoice>("new");
-  let minStd = $state<number | null>(0.04);
-  let noteMethod = $state<NoteConversion>("hslc");
   // penalties are in semitones of movement: moving a whole chord's weight one
   // semitone against its hue costs 1
-  let fit = $state<FitDraft>({
-    keyFit: "one",
-    mode: "any",
-    offKey: 4,
-    drop: 3,
-    register: 0.5,
-    clash: 1,
-    triad: 0.5,
-    progression: 0.2,
-    parallel: 0.5,
-    leap: 0.5,
-    movement: 0.1,
-    ending: 1,
-    mud: 1,
-    root: 0.2,
-    minorFifth: 0.5,
-    leading: 1,
-    phrase: 8,
-    cadence: 1,
-    keyChange: 3,
-  });
-  let refineMethod = $state<RefineMethod>("trim");
-  let minWeight = $state<number | null>(0.02);
-  let surround = $state<number | null>(0.5);
-  let noteLength = $state<NoteLength>("area");
-  let hold = $state<"hold" | "strike">("hold");
-  let fill = $state<"off" | "on">("off");
-  let maxNotes = $state<number | null>(4);
+  const defaults: {
+    tempoMethod: TempoMethod;
+    // the method "match the picture" uses
+    tempoSource: Exclude<TempoMethod, "manual">;
+    cycles: "1" | "2";
+    duration: number;
+    region: RegionMethod;
+    orderMethod: OrderMethod;
+    colorChoice: ColorChoice;
+    minStd: number;
+    noteMethod: NoteConversion;
+    refineMethod: RefineMethod;
+    minWeight: number;
+    surround: number;
+    noteLength: NoteLength;
+    hold: "hold" | "strike";
+    fill: boolean;
+    maxNotes: number;
+    fit: FitOptions;
+  } = {
+    tempoMethod: "edges",
+    tempoSource: "edges",
+    cycles: "1",
+    duration: 30,
+    region: "shape",
+    orderMethod: "path",
+    colorChoice: "proportional",
+    minStd: 0.04,
+    noteMethod: "hslc",
+    refineMethod: "trim",
+    minWeight: 0.02,
+    surround: 0.5,
+    noteLength: "area",
+    hold: "hold",
+    fill: false,
+    maxNotes: 3,
+    fit: {
+      keyFit: "one",
+      mode: "any",
+      offKey: 8,
+      drop: 2,
+      register: 0.5,
+      clash: 3,
+      triad: 2,
+      progression: 0.2,
+      parallel: 2,
+      leap: 1,
+      movement: 0.3,
+      ending: 1,
+      mud: 3,
+      root: 0.5,
+      minorFifth: 0.5,
+      leading: 1,
+      phrase: 8,
+      cadence: 1,
+      keyChange: 3,
+    },
+  };
+
+  let tempoMethod = $state(defaults.tempoMethod);
+  let tempoSource = $state(defaults.tempoSource);
+  let cycles = $state(defaults.cycles);
+  let bpm = $state<number | null>(80);
+  let duration = $state(defaults.duration);
+  let region = $state(defaults.region);
+  let orderMethod = $state(defaults.orderMethod);
+  let colorChoice = $state(defaults.colorChoice);
+  let minStd = $state(defaults.minStd);
+  let noteMethod = $state(defaults.noteMethod);
+  let fit = $state<FitOptions>({ ...defaults.fit });
+  let refineMethod = $state(defaults.refineMethod);
+  let minWeight = $state(defaults.minWeight);
+  let surround = $state(defaults.surround);
+  let noteLength = $state(defaults.noteLength);
+  let hold = $state(defaults.hold);
+  let fill = $state(defaults.fill);
+  let maxNotes = $state(defaults.maxNotes);
   let image = $state<string | null>(null);
   let imgdata = $state.raw<ImageData | null>(null);
   let song = $state.raw<Chord[] | null>(null);
   let playing = $state<number | null>(null);
+  // where playback will start from: set by clicking a region or the strip
+  let cursor = $state<number | null>(null);
+  let showPath = $state(false);
+  let showSheet = $state(false);
+  let exporting = $state(false);
   let processing = $state(false);
   let error = $state<string | null>(null);
   let extracting = $state(false);
@@ -77,6 +131,75 @@
       image = URL.createObjectURL(file);
     } else if (fileRejections.length > 0) {
       error = "Drop a single image file.";
+    }
+  }
+
+  function remove(): void {
+    if (image) URL.revokeObjectURL(image);
+    image = null;
+  }
+
+  function reset(): void {
+    ({
+      tempoMethod,
+      tempoSource,
+      cycles,
+      duration,
+      region,
+      orderMethod,
+      colorChoice,
+      minStd,
+      noteMethod,
+      refineMethod,
+      minWeight,
+      surround,
+      noteLength,
+      hold,
+      fill,
+      maxNotes,
+    } = defaults);
+    fit = { ...defaults.fit };
+  }
+
+  // moves the cursor and pauses there; play carries on from it
+  function seek(index: number): void {
+    if (song && index < song.length) {
+      playing = null;
+      cursor = index;
+    }
+  }
+
+  function toggle(): void {
+    if (playing !== null) {
+      // stopping leaves the cursor where the song was
+      cursor = playing;
+      playing = null;
+    } else if (ready && !processing && song && song.length > 0) {
+      // browsers only let audio start from inside a click or key press
+      void start();
+      playing = cursor ?? 0;
+      cursor = null;
+    }
+  }
+
+  // render the song to an audio file and hand it to the browser to save
+  function exportAudio(): void {
+    if (song && song.length > 0 && !exporting) {
+      exporting = true;
+      import("../lib/render")
+        .then(({ renderAudio }) => renderAudio(song ?? [], hold === "hold"))
+        .then(
+          ({ file, extension }) => {
+            save(file, `synesthizer.${extension}`);
+          },
+          (err) => {
+            console.error(err);
+            error = `Could not export the audio: ${err}`;
+          },
+        )
+        .finally(() => {
+          exporting = false;
+        });
     }
   }
 
@@ -119,9 +242,9 @@
   // if tempo method is set, look at the image to extract tempo
   $effect(() => {
     playing = null;
-    if (imgdata && tempoMethod === "mean-key") {
+    if (imgdata && tempoMethod !== "manual") {
       song = null; // clear song while we extract new tempo
-      bpm = meanKeyTempo(imgdata);
+      bpm = tempoOf(imgdata, tempoMethod);
       extracting = false;
     }
   });
@@ -129,17 +252,12 @@
   // based on configs, convert image to song
   $effect(() => {
     playing = null;
+    cursor = null;
     song = null;
     processing = false;
     if (
       imgdata &&
       bpm !== null &&
-      duration !== null &&
-      minWeight !== null &&
-      maxNotes !== null &&
-      minStd !== null &&
-      surround !== null &&
-      fitOptions !== null &&
       (tempoMethod === "manual" || !extracting)
     ) {
       const img = imgdata;
@@ -154,10 +272,11 @@
         refineMethod,
         minWeight,
         maxNotes,
+        cycles: Number(cycles),
         surround,
         noteLength,
-        fill: fill === "on",
-        fit: fitOptions,
+        fill,
+        fit: $state.snapshot(fit),
       };
       const controller = new AbortController();
       processing = true;
@@ -187,55 +306,77 @@
     }
   });
 
-  // null while any penalty field is empty or out of range
-  const fitOptions = $derived.by((): FitOptions | null => {
-    const snapshot = $state.snapshot(fit);
-    return Object.values(snapshot).includes(null)
-      ? null
-      : (snapshot as FitOptions);
-  });
-
-  const progress = $derived(
-    song && song.length > 0 && playing !== null
-      ? ((playing + 1) / song.length) * 100
-      : 0,
-  );
+  const hasSong = $derived(song !== null && song.length > 0);
+  const tool =
+    "grid size-10 place-items-center rounded-full border-[1.5px] border-line hover:border-ink transition duration-150 active:scale-[0.97] motion-reduce:transition-none aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:border-line aria-disabled:active:scale-100";
 </script>
 
-<div class="flex flex-col items-center md:h-full">
-  <header
-    class="sticky top-0 z-20 w-full border-b border-gray-200 bg-white/80 backdrop-blur dark:border-gray-800 dark:bg-gray-950/80"
-  >
-    <div class="flex items-center gap-3 px-4 py-3">
-      <img
-        src={asset("favicon.ico")}
-        alt=""
-        width="32"
-        height="32"
-        class="rounded"
-      />
-      <div class="leading-tight">
-        <h1
-          class="bg-gradient-to-r from-rose-500 via-emerald-500 to-indigo-500 bg-clip-text text-2xl font-bold text-transparent"
-        >
-          Synesthizer
-        </h1>
-        <p class="text-xs text-gray-500 dark:text-gray-400">
-          Turn images into piano compositions
-        </p>
-      </div>
-      <div class="ml-auto">
-        <ThemeToggle />
-      </div>
+<svelte:window
+  onkeydown={(event) => {
+    if (
+      event.code === "Space" &&
+      event.target instanceof Element &&
+      !event.target.closest("input, select, button, summary, label")
+    ) {
+      event.preventDefault();
+      toggle();
+    }
+  }}
+/>
+
+<div
+  class="mx-auto flex max-w-[1360px] flex-col gap-3.5 px-4 pt-3 pb-7 min-[900px]:px-6"
+>
+  <header class="flex items-center gap-3">
+    <Mark />
+    <div class="min-w-0">
+      <h1 class="text-[22px] leading-[1.1] font-bold tracking-[-0.01em]">
+        Synesthizer
+      </h1>
+      <p class="mt-[3px] text-xs text-muted min-[421px]:text-[13px]">
+        Turn images into piano compositions
+      </p>
+    </div>
+    <div class="ml-auto flex gap-2">
+      <button
+        class={tool}
+        type="button"
+        aria-disabled={!hasSong}
+        aria-label="Sheet music"
+        title="Sheet music"
+        onclick={() => {
+          showSheet = hasSong;
+        }}
+      >
+        <FileMusic aria-hidden="true" class="size-5" />
+      </button>
+      <button
+        class={tool}
+        type="button"
+        aria-disabled={!hasSong || exporting}
+        aria-label="Export audio"
+        title="Export audio"
+        onclick={exportAudio}
+      >
+        {#if exporting}
+          <LoaderCircle aria-hidden="true" class="size-5 animate-spin" />
+        {:else}
+          <Download aria-hidden="true" class="size-5" />
+        {/if}
+      </button>
+      <ThemeToggle />
     </div>
   </header>
+  {#if song && bpm !== null}
+    <SheetMusic bind:open={showSheet} {song} {bpm} />
+  {/if}
   <Dropzone
     accept="image/*"
     multiple={false}
     noClick
     noKeyboard
     disableDefaultStyles
-    containerClasses="relative flex w-full grow flex-col gap-2 p-2 md:flex-row"
+    containerClasses="relative grid grid-cols-[minmax(0,1fr)] gap-3.5 min-[900px]:grid-cols-[minmax(0,1fr)_348px] min-[900px]:items-start"
     role="presentation"
     tabindex={-1}
     bind:inputElement={picker}
@@ -244,57 +385,69 @@
     on:filedropped={() => (dragging = false)}
     on:drop={onDrop}
   >
-    <Controls
+    <Stage
+      {image}
+      {imgdata}
       {song}
-      hasImage={image !== null}
-      onUpload={upload}
-      bind:tempoMethod
-      bind:bpm
-      bind:duration
-      bind:region
-      bind:orderMethod
-      bind:colorChoice
-      bind:minStd
-      bind:noteMethod
-      bind:refineMethod
-      bind:minWeight
-      bind:maxNotes
-      bind:surround
-      bind:noteLength
-      bind:hold
-      bind:fill
-      bind:fit
-      bind:playing
-      {processing}
-      {ready}
+      {playing}
+      shown={playing ?? cursor}
+      {showPath}
+      {dragging}
       {error}
+      onUpload={upload}
+      onRemove={remove}
+      onSeek={seek}
     />
-    <ImageRender {image} {song} {playing} {imgdata} onUpload={upload} />
-    {#if dragging}
-      <div
-        class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-indigo-500 bg-indigo-500/10 backdrop-blur-sm"
+    <section class="min-w-0 min-[900px]:col-start-1" aria-label="Playback">
+      <Transport
+        {song}
+        {playing}
+        shown={playing ?? cursor}
+        {processing}
+        {ready}
+        {bpm}
+        onToggle={toggle}
+        onSeek={seek}
+      />
+    </section>
+    <aside
+      class="flex min-w-0 flex-col gap-3.5 *:shrink-0 min-[900px]:sticky min-[900px]:top-3 min-[900px]:col-start-2 min-[900px]:row-span-2 min-[900px]:row-start-1 min-[900px]:max-h-[calc(100vh-99px)] min-[900px]:overflow-y-auto min-[900px]:[scrollbar-width:thin]"
+      aria-label="Settings"
+    >
+      <Now {song} shown={playing ?? cursor} hasImage={image !== null} />
+      {#if error && image}
+        <p class="font-semibold text-signal" role="alert">{error}</p>
+      {/if}
+      <Settings
+        bind:tempoMethod
+        bind:tempoSource
+        bind:cycles
+        bind:bpm
+        bind:duration
+        bind:region
+        bind:orderMethod
+        bind:colorChoice
+        bind:minStd
+        bind:minWeight
+        bind:maxNotes
+        bind:surround
+        bind:noteLength
+        bind:hold
+        bind:fill
+        bind:fit
+        bind:showPath
+        onReset={reset}
       >
-        <p class="text-lg font-bold text-indigo-700 dark:text-indigo-300">
-          Drop image to upload
-        </p>
-      </div>
-    {/if}
+        {#snippet debug()}
+          <HueCone
+            {imgdata}
+            chord={song?.[playing ?? cursor ?? -1] ?? null}
+            cycles={Number(cycles)}
+          />
+        {/snippet}
+      </Settings>
+    </aside>
   </Dropzone>
-  <div class="h-1 w-full">
-    {#if song}
-      <div
-        class="h-full bg-gray-200 dark:bg-gray-800"
-        role="progressbar"
-        aria-label="playback progress"
-        aria-valuenow={Math.round(progress)}
-      >
-        <div
-          class="h-full bg-gradient-to-r from-rose-500 via-emerald-500 to-indigo-500 transition-[width] duration-200"
-          style:width="{progress}%"
-        ></div>
-      </div>
-    {/if}
-  </div>
   <p class="sr-only" aria-live="polite">
     {processing ? "Processing…" : (song?.[playing ?? -1]?.notes.join(" ") ?? "")}
   </p>

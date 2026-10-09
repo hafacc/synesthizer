@@ -5,18 +5,14 @@
   import { setMode, userPrefersMode } from "mode-watcher";
   import { onMount } from "svelte";
 
-  const cycle = ["light", "dark", "system"] as const;
+  const cycle = ["system", "light", "dark"] as const;
   type Theme = (typeof cycle)[number];
 
-  const view: Record<Theme, { Icon: typeof Sun; label: string; next: string }> =
+  const view: Record<Theme, { Icon: typeof Sun; name: string; next: string }> =
     {
-      light: { Icon: Sun, label: "Light theme", next: "Switch to dark theme" },
-      dark: { Icon: Moon, label: "Dark theme", next: "Switch to system theme" },
-      system: {
-        Icon: Contrast,
-        label: "System theme",
-        next: "Switch to light theme",
-      },
+      system: { Icon: Contrast, name: "System", next: "light" },
+      light: { Icon: Sun, name: "Light", next: "dark" },
+      dark: { Icon: Moon, name: "Dark", next: "system" },
     };
 
   // theme is only known on the client, so render a stable fallback until mounted
@@ -25,15 +21,15 @@
     mounted = true;
   });
   const current = $derived<Theme>(mounted ? userPrefersMode.current : "system");
-  const { Icon, label, next } = $derived(view[current]);
+  const { Icon, name, next } = $derived(view[current]);
 </script>
 
 <button
+  class="grid size-10 place-items-center rounded-full border-[1.5px] border-line hover:border-ink transition duration-150 active:scale-[0.97] motion-reduce:transition-none"
   type="button"
   onclick={() => setMode(cycle[(cycle.indexOf(current) + 1) % cycle.length])}
-  title={next}
-  aria-label="{label}. {next}"
-  class="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+  title="{name} theme. Switch to {next} theme"
+  aria-label="{name} theme. Switch to {next} theme"
 >
-  <Icon aria-hidden="true" class="h-5 w-5" />
+  <Icon aria-hidden="true" class="size-5" />
 </button>

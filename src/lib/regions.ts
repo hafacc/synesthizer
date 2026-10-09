@@ -1,10 +1,11 @@
 /** extract ordered regions from an image to turn into notes */
 
+import { blobbed } from "./blobs";
 import { type HSLC, type RGB, rgb2hslc } from "./colors";
 import { shaped } from "./shapes";
 import { ArrayVariance } from "./utils";
 
-export type RegionMethod = "grid" | "bisect" | "shape";
+export type RegionMethod = "grid" | "bisect" | "shape" | "blob";
 
 export interface Region {
   colors: Iterable<RGB>;
@@ -320,6 +321,8 @@ export function regions(
     return bisected(img, noted);
   } else if (method === "shape") {
     return shaped(img, noted);
+  } else if (method === "blob") {
+    return blobbed(img, noted);
   } else {
     throw new Error(`unknown region method ${method}`);
   }
