@@ -17,6 +17,8 @@ export interface Chord {
   velocity: number;
   // name of the key the chord was fitted to, like "Ab minor"
   key: string | null;
+  // whether that key is written with sharps, so its notes should be too
+  sharps: boolean;
   // duration in ms
   duration: number;
   // color for rendering
@@ -39,6 +41,8 @@ export interface Message {
   refineMethod: RefineMethod;
   minWeight: number;
   maxNotes: number;
+  // how many times the twelve notes go around the hue wheel
+  cycles: number;
   // share of a chord's votes that come from the colors around its region
   surround: number;
   noteLength: NoteLength;

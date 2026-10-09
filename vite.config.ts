@@ -8,9 +8,21 @@ import { defineConfig } from "vite";
 const base = (process.env.BASE_PATH ?? "") as "" | `/${string}`;
 
 export default defineConfig({
-  // only the worker imports these, so vite finds them late and reloads the
-  // page on the first conversion unless told up front
-  optimizeDeps: { include: ["core-js/actual/iterator", "uuid"] },
+  // these are only imported by the worker or on demand, so vite finds them
+  // late and reloads the page, or fails the import, unless told up front
+  optimizeDeps: {
+    include: [
+      "abcjs",
+      "core-js/actual/iterator",
+      "jspdf",
+      "mediabunny",
+      "svg2pdf.js",
+      "three",
+      "three/examples/jsm/controls/OrbitControls.js",
+      "three/examples/jsm/renderers/CSS2DRenderer.js",
+      "uuid",
+    ],
+  },
   plugins: [
     tailwindcss(),
     sveltekit({

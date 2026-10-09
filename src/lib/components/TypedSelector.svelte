@@ -1,4 +1,6 @@
 <script lang="ts" generics="Value extends string">
+  import Segmented from "./Segmented.svelte";
+
   let {
     title,
     value = $bindable(),
@@ -8,19 +10,16 @@
     value: Value;
     values: [Value, string][];
   } = $props();
-
-  const id = $props.id();
 </script>
 
-<div>
-  <label class="block text-sm font-semibold" for={id}>{title}</label>
-  <select
-    {id}
-    class="mt-0.5 block w-full rounded border border-gray-300 bg-gray-50 p-1.5 outline-violet-600 focus:outline-2 disabled:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:disabled:text-gray-500"
-    bind:value
-  >
-    {#each values as [key, name] (key)}
-      <option value={key}>{name}</option>
-    {/each}
-  </select>
+<!-- titles of different lengths share a row, so each sits on the bottom of its
+  cell and the fields line up; more than two choices need the whole row -->
+<div
+  class="grid min-w-0 grid-rows-[1fr_auto] items-end gap-[5px] {values.length >
+  2
+    ? 'col-span-full'
+    : ''}"
+>
+  <span class="text-[13px] leading-tight font-semibold text-muted">{title}</span>
+  <Segmented bind:value {values} label={title} />
 </div>

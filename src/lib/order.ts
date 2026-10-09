@@ -42,7 +42,8 @@ function medianSpacing(centers: [number, number][]): number {
 }
 
 /**
- * reading order: top-to-bottom, left-to-right
+ * reading order: top-to-bottom in rows that alternate direction, so the end
+ * of one row is next to the start of the following one
  *
  * a plain lexicographic sort on floating-point centers would zig-zag whenever
  * two regions in the same visual row differ slightly in y, so we group centers
@@ -58,8 +59,13 @@ function wordOrder(regions: Region[]): Region[] {
   const ordered: Region[] = [];
   let row: number[] = [];
   let rowTop = Number.NEGATIVE_INFINITY;
+  let leftward = false;
   const flush = () => {
     row.sort((left, right) => centers[left][0] - centers[right][0]);
+    if (leftward) {
+      row.reverse();
+    }
+    leftward = !leftward;
     for (const index of row) {
       ordered.push(regions[index]);
     }

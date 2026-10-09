@@ -31,8 +31,9 @@ function sortedCenters(regions: readonly Region[]): [number, number][] {
     .sort((left, right) => left[0] - right[0] || left[1] - right[1]);
 }
 
-test("word order recovers reading order from jittered rows", () => {
-  // y values jitter within a row but stay well inside the unit spacing
+test("word order zigzags down jittered rows", () => {
+  // y values jitter within a row but stay well inside the unit spacing; the
+  // second row runs right to left so it starts under the end of the first
   const items = [
     region([2, 0.1], 0),
     region([0, 0.0], 0),
@@ -45,9 +46,9 @@ test("word order recovers reading order from jittered rows", () => {
     [0, 0],
     [1, 0.2],
     [2, 0.1],
-    [0, 0.9],
-    [1, 1.1],
     [2, 1.0],
+    [1, 1.1],
+    [0, 0.9],
   ]);
 });
 

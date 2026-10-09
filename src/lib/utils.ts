@@ -22,6 +22,15 @@ export async function getImageData(url: string): Promise<ImageData> {
   }
 }
 
+/** hand a file to the browser to save under a name */
+export function save(file: Blob, name: string): void {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(file);
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
 type Writeable<T> = { -readonly [P in keyof T]: T[P] };
 
 export class ArrayMean<V extends readonly number[] = readonly number[]> {

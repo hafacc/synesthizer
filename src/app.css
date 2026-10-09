@@ -1,5 +1,106 @@
 @import "tailwindcss";
 
-/* drive `dark:` off a `.dark` class so the toggle can override the OS;
-   mode-watcher sets the class (and color-scheme) on <html> */
+/* `dark:` follows the `.dark` class that mode-watcher puts on <html> */
 @custom-variant dark (&:where(.dark, .dark *));
+
+@font-face {
+  /* M PLUS 1p cut down to note names: A–G, digits and the flat, natural and
+     sharp signs, which Hanken Grotesk lacks */
+  font-family: "Note Names";
+  font-weight: 500;
+  font-display: swap;
+  src: url("./lib/assets/m-plus-1p-notes-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Note Names";
+  font-weight: 700;
+  font-display: swap;
+  src: url("./lib/assets/m-plus-1p-notes-700.woff2") format("woff2");
+}
+
+/* the picture sits on a neutral wall; these name the surfaces and inks, and
+   the dark theme below gives each a second value, so components never need a
+   `dark:` class for color */
+@theme {
+  --color-wall: #f4f4f2;
+  --color-surface: #fbfbfa;
+  --color-raised: #ffffff;
+  --color-mat: #e4e4e0;
+  --color-ink: #1b1d22;
+  --color-muted: #5f636c;
+  --color-line: #d5d6d2;
+  --color-accent: #34508f;
+  --color-accent-ink: #ffffff;
+  --color-signal: #b8473a;
+  --color-signal-ink: #ffffff;
+  --color-hue-1: #c2566b;
+  --color-hue-2: #d9a441;
+  --color-hue-3: #3f8f86;
+  --color-hue-4: #4a5fa8;
+  --font-sans:
+    "Hanken Grotesk Variable", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-note:
+    "Note Names", "Hanken Grotesk Variable", "Avenir Next", "Segoe UI",
+    system-ui, sans-serif;
+  --animate-busy: busy 1.4s ease-in-out infinite;
+  @keyframes busy {
+    50% {
+      opacity: 0.25;
+    }
+  }
+}
+
+@layer base {
+  .dark {
+    --color-wall: #17181b;
+    --color-surface: #1f2024;
+    --color-raised: #292b30;
+    --color-mat: #0f1012;
+    --color-ink: #ecedef;
+    --color-muted: #a0a4ad;
+    --color-line: #383a41;
+    --color-accent: #a3b4e6;
+    --color-accent-ink: #17181b;
+    --color-signal: #e88a7d;
+    --color-signal-ink: #17181b;
+    --color-hue-1: #d97a8c;
+    --color-hue-2: #e3b65c;
+    --color-hue-3: #5fb0a6;
+    --color-hue-4: #8496da;
+  }
+  body {
+    @apply bg-wall text-ink font-sans text-[15px] leading-[1.45] antialiased;
+  }
+  :focus-visible {
+    @apply outline-accent outline-3 outline-offset-2;
+  }
+}
+
+@layer components {
+  /* a region drawn over the picture; its states are set from script */
+  .cell {
+    fill-opacity: 0;
+    stroke: #fff;
+    stroke-opacity: 0.16;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    cursor: pointer;
+    transition: fill-opacity 0.5s;
+  }
+  .cell:hover {
+    fill-opacity: 0.8;
+    transition: none;
+  }
+  .cell.t2 {
+    fill-opacity: 0.3;
+  }
+  .cell.t1 {
+    fill-opacity: 0.6;
+  }
+  .cell.on {
+    fill-opacity: 1;
+    stroke-opacity: 1;
+    stroke-width: 3;
+    transition: none;
+  }
+}
