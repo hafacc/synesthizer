@@ -1,12 +1,13 @@
 <script lang="ts">
   import { start } from "tone";
   import type { ColorChoice } from "../extraction";
+  import type { FitDraft, FitOptions } from "../fit";
   import type { NoteConversion } from "../notes";
   import type { OrderMethod } from "../order";
   import type { RefineMethod } from "../refine";
   import type { RegionMethod } from "../regions";
   import type { TempoMethod } from "../tempo";
-  import type { Chord } from "../worker-interface";
+  import type { Chord, NoteLength } from "../worker-interface";
   import NumericSelector from "./NumericSelector.svelte";
   import TypedSelector from "./TypedSelector.svelte";
 
@@ -25,6 +26,11 @@
     refineMethod = $bindable(),
     minWeight = $bindable(),
     maxNotes = $bindable(),
+    surround = $bindable(),
+    noteLength = $bindable(),
+    hold = $bindable(),
+    fill = $bindable(),
+    fit = $bindable(),
     playing = $bindable(),
     processing,
     ready,
@@ -44,11 +50,38 @@
     refineMethod: RefineMethod;
     minWeight: number | null;
     maxNotes: number | null;
+    surround: number | null;
+    noteLength: NoteLength;
+    hold: "hold" | "strike";
+    fill: "off" | "on";
+    fit: FitDraft;
     playing: number | null;
     processing: boolean;
     ready: boolean;
     error: string | null;
   } = $props();
+
+  const penalties: [
+    Exclude<keyof FitOptions, "keyFit" | "mode" | "keyChange" | "phrase">,
+    string,
+  ][] =
+    [
+      ["offKey", "Off-Key Penalty"],
+      ["drop", "Dropped Note Penalty"],
+      ["register", "Octave Shift Penalty"],
+      ["clash", "Semitone Clash Penalty"],
+      ["triad", "Off-Triad Penalty"],
+      ["progression", "Weak Progression Penalty"],
+      ["parallel", "Parallel Fifth Penalty"],
+      ["leap", "Melody Leap Penalty"],
+      ["movement", "Movement Penalty"],
+      ["ending", "Unresolved Ending Penalty"],
+      ["mud", "Low Mud Penalty"],
+      ["root", "Inverted Chord Penalty"],
+      ["minorFifth", "Minor Fifth Penalty"],
+      ["leading", "Unresolved Leading Note Penalty"],
+      ["cadence", "Missing Cadence Penalty"],
+    ];
 
   // one button for every state, marked rather than natively disabled, so
   // keyboard focus stays on it as it changes
@@ -117,6 +150,7 @@
       ["mean", "Mean"],
       ["xmeans", "X-Means"],
       ["proportional", "Proportional"],
+      ["new", "New"],
     ]}
   />
   <NumericSelector
@@ -143,7 +177,11 @@
   <TypedSelector
     title="Region Selection"
     bind:value={region}
-    values={[["grid", "Grid"]]}
+    values={[
+      ["grid", "Grid"],
+      ["bisect", "Bisection"],
+      ["shape", "Free Shapes"],
+    ]}
   />
   <TypedSelector
     title="Order Selection"
@@ -151,6 +189,7 @@
     values={[
       ["word", "Word Order"],
       ["focal-spiral", "Focal Spiral"],
+      ["path", "Shortest Path"],
     ]}
   />
   <TypedSelector
@@ -163,6 +202,79 @@
     bind:value={refineMethod}
     values={[["trim", "Trim"]]}
   />
+  <TypedSelector
+    title="Note Lengths"
+    bind:value={noteLength}
+    values={[
+      ["even", "Even"],
+      ["area", "By Area"],
+    ]}
+  />
+  <TypedSelector
+    title="Repeated Notes"
+    bind:value={hold}
+    values={[
+      ["strike", "Strike Again"],
+      ["hold", "Hold"],
+    ]}
+  />
+  {#if colorChoice === "new"}
+    <NumericSelector
+      title="Surrounding Color Share"
+      min={0}
+      max={0.9}
+      step={0.1}
+      bind:value={surround}
+    />
+    <TypedSelector
+      title="Key Fitting"
+      bind:value={fit.keyFit}
+      values={[
+        ["off", "Off"],
+        ["one", "One Key"],
+        ["change", "One Key Change"],
+      ]}
+    />
+    {#if fit.keyFit !== "off"}
+      <TypedSelector
+        title="Key Mode"
+        bind:value={fit.mode}
+        values={[
+          ["any", "Any"],
+          ["major", "Major"],
+          ["minor", "Minor"],
+        ]}
+      />
+      <TypedSelector
+        title="Fill Triads"
+        bind:value={fill}
+        values={[
+          ["off", "Off"],
+          ["on", "On"],
+        ]}
+      />
+      <NumericSelector
+        title="Phrase Length"
+        min={0}
+        integer
+        bind:value={fit.phrase}
+      />
+      {#each penalties as [name, title] (name)}
+        <NumericSelector {title} min={0} step={0.1} bind:value={fit[name]} />
+      {/each}
+      {#if fit.keyFit === "change"}
+        <NumericSelector
+          title="Key Change Penalty"
+          min={0}
+          step={0.1}
+          bind:value={fit.keyChange}
+        />
+      {/if}
+    {/if}
+  {/if}
+  {#if song && playing !== null && song[playing]?.key}
+    <p class="text-sm font-semibold">{song[playing].key}</p>
+  {/if}
   {#if error}
     <div
       class="w-full rounded border border-red-400 bg-red-100 p-2 text-red-700 dark:border-red-500/50 dark:bg-red-950/50 dark:text-red-300"

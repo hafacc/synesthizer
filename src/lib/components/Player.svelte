@@ -9,20 +9,35 @@
     song,
     playing = $bindable(),
     ready = $bindable(),
+    hold,
     onerror,
   }: {
     song: Chord[] | null;
     playing: number | null;
     ready: boolean;
+    // whether a note shared with the previous chord keeps ringing
+    hold: boolean;
     onerror: (message: string) => void;
   } = $props();
 
   const octaves = [1, 2, 3, 4, 5, 6, 7] as const;
+  // how hard a chord's quiet notes are struck
+  const softVelocity = 0.25;
 
   let sampler = $state.raw<Sampler | null>(null);
   // index of the chord sounding now, and when it was due to start
   let current: number | null = null;
   let due = 0;
+  // notes struck and not yet released
+  let sounding = new Set<string>();
+
+  function release(instrument: Sampler, notes: Iterable<string>): void {
+    try {
+      instrument.triggerRelease([...notes]);
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   // mounting only happens in the browser, so the audio sampler is never
   // constructed during the static prerender
@@ -64,12 +79,19 @@
       }
       current = index;
       due += duration;
+      const wanted = new Set<string>([...chord.notes, ...chord.soft]);
+      const kept = hold ? sounding.intersection(wanted) : new Set<string>();
+      release(instrument, sounding.difference(kept));
+      const fresh = (notes: readonly string[]): string[] =>
+        notes.filter((note) => !kept.has(note));
       try {
-        instrument.triggerAttack(chord.notes);
+        instrument.triggerAttack(fresh(chord.notes), undefined, chord.velocity);
+        instrument.triggerAttack(fresh(chord.soft), undefined, softVelocity);
       } catch (err) {
         // a sample that failed to load; skip the chord rather than stop
         console.error(err);
       }
+      sounding = wanted;
       const num = setTimeout(
         () => {
           playing = final ? null : index + 1;
@@ -77,17 +99,15 @@
         Math.max(0, due - performance.now()),
       );
 
-      // cleanup if playback is interrupted
       return () => {
-        try {
-          instrument.triggerRelease(chord.notes);
-        } catch (err) {
-          console.error(err);
-        }
         clearTimeout(num);
       };
     } else {
       current = null;
+      if (sampler) {
+        release(sampler, sounding);
+      }
+      sounding = new Set<string>();
     }
   });
 </script>

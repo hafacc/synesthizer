@@ -4,7 +4,7 @@ import { type HSLC, hslc2rgb, type RGB, rgb2hslc } from "./colors";
 import { xmeans } from "./kmeans";
 import { ArrayMean } from "./utils";
 
-export type ColorChoice = "mean" | "xmeans" | "proportional";
+export type ColorChoice = "mean" | "xmeans" | "proportional" | "new" | "new2";
 
 export function* rgbMean(colors: Iterable<RGB>): Generator<[RGB, number]> {
   const mean = new ArrayMean<RGB>();
@@ -61,7 +61,7 @@ export function* proportional(colors: Iterable<RGB>): Generator<[RGB, number]> {
 
 export function extract(
   colors: Iterable<RGB>,
-  mode: ColorChoice,
+  mode: Exclude<ColorChoice, "new" | "new2">,
   { num, maxNotes, minStd }: { num: number; maxNotes: number; minStd: number },
 ): Generator<[RGB, number]> {
   if (mode === "mean") {

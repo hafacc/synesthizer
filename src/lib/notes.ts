@@ -22,21 +22,34 @@ export function flat2sharp(flat: string): string {
   return flat.replaceAll(/[ABDEG]b/gi, (mat) => `${shiftLetter(mat[0], -1)}#`);
 }
 
+/** note names in piano-key order, spelled with flats to match the sample files */
 export const orderedNotes = [
   "C",
-  "D",
   "Db",
-  "E",
+  "D",
   "Eb",
+  "E",
   "F",
-  "G",
   "Gb",
-  "A",
+  "G",
   "Ab",
-  "B",
+  "A",
   "Bb",
+  "B",
 ] as const;
 type Note = (typeof orderedNotes)[number];
+
+/** midi number of a note name like "Ab4" */
+export function note2midi(name: string): number {
+  const octave = Number(name.slice(-1));
+  const note = orderedNotes.indexOf(name.slice(0, -1) as Note);
+  return 12 * (octave + 1) + note;
+}
+
+/** name of a midi note, like "Ab4" */
+export function midi2note(midi: number): string {
+  return `${orderedNotes[midi % 12]}${Math.floor(midi / 12) - 1}`;
+}
 
 export function hslc2note(color: RGB): [Note, number] {
   const [h, , l] = rgb2hsl(color);
