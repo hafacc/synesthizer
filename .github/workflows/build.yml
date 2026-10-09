@@ -21,19 +21,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun lint
-      - if: inputs.upload-pages
+      - id: pages
+        if: inputs.upload-pages
         uses: actions/configure-pages@v5
-        with:
-          static_site_generator: next
-      - uses: actions/cache@v4
-        with:
-          path: |
-            .next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-
       - run: bun export
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
       - if: inputs.upload-pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./out
+          path: ./build
