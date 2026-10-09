@@ -1,6 +1,7 @@
 {
   "name": "synesthizer",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "clean-audio": "for file in public/*.aiff; do ffmpeg -y -i $file -af silenceremove=start_periods=1:start_duration=0.1:start_threshold=-60dB ${file%%.aiff}.mp3; done",
