@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+/* drive `dark:` off a `.dark` class so the toggle can override the OS;
+   mode-watcher sets the class (and color-scheme) on <html> */
+@custom-variant dark (&:where(.dark, .dark *));

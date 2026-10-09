@@ -7,13 +7,11 @@
   },
   "files": {
     "includes": [
-      "app/**/*.tsx",
-      "app/**/*.css",
-      "components/**/*.tsx",
       "src/**/*.ts",
-      "*.ts",
-      "*.mjs",
-      "!next-env.d.ts"
+      "src/**/*.svelte",
+      "src/**/*.css",
+      "src/**/*.html",
+      "*.ts"
     ],
     "ignoreUnknown": false
   },
@@ -49,6 +47,12 @@
       "source": {
         "organizeImports": "on"
       }
+    }
+  },
+  "html": {
+    "experimentalFullSupportEnabled": true,
+    "formatter": {
+      "indentScriptAndStyle": true
     }
   }
 }
