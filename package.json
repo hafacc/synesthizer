@@ -26,7 +26,7 @@
     "svg2pdf.js": "^2.8.1",
     "three": "^0.186.1",
     "tone": "^15.1.22",
-    "uuid": "^14.0.0"
+    "uuid": "^14.0.2"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
