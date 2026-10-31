@@ -1,5 +1,6 @@
 /** module for writing a song out: as timed notes to render, and as sheet music */
 
+import { handSplit } from "./hands";
 import { note2midi } from "./notes";
 import type { Chord } from "./worker-interface";
 
@@ -144,7 +145,9 @@ function writtenLengths(length: number): number[] {
 /**
  * Write a song as abc notation, for two piano staves.
  *
- * Notes from middle C up go on the treble staff and the rest on the bass. The
+ * Each chord is split between the hands, the right hand's notes on the treble
+ * staff and the left's on the bass, dividing at middle C when both hands can
+ * still reach their notes and elsewhere when they can't. The
  * key signature follows each chord's fitted key, changing mid-piece if the key
  * does, and notes are spelled with that key's sharps or flats. Lengths are in
  * eighth notes with a beat as a quarter, bars hold four beats, and a chord
@@ -156,9 +159,24 @@ function writtenLengths(length: number): number[] {
  */
 export function toAbc(song: readonly Chord[], bpm: number): string {
   const beat = 60000 / bpm;
+  // each chord's notes low to high, and how many of them the left hand takes
+  const hands = song.map((chord) => {
+    const midis = [...new Set([...chord.notes, ...chord.soft].map(note2midi))];
+    midis.sort((low, high) => low - high);
+    const split = handSplit(midis) ?? midis.filter((midi) => midi < 60).length;
+    return { midis, split };
+  });
   const voices = [
-    { name: "1", clef: "treble", holds: (midi: number) => midi >= 60 },
-    { name: "2", clef: "bass", holds: (midi: number) => midi < 60 },
+    {
+      name: "1",
+      clef: "treble",
+      part: (index: number) => hands[index].midis.slice(hands[index].split),
+    },
+    {
+      name: "2",
+      clef: "bass",
+      part: (index: number) => hands[index].midis.slice(0, hands[index].split),
+    },
   ];
   const first = signatureOf(song[0]?.key ?? null);
   const lines = [
@@ -170,24 +188,21 @@ export function toAbc(song: readonly Chord[], bpm: number): string {
     ...voices.map(({ name, clef }) => `V:${name} clef=${clef}`),
     `K:${first.name}`,
   ];
-  for (const { name, holds } of voices) {
+  for (const { name, part } of voices) {
     let signature = first;
     let key = song[0]?.key ?? null;
     // accidentals written so far in this bar, by letter and octave
     let written = new Map<string, number>();
     let filled = 0;
     let text = "";
-    for (const chord of song) {
+    for (const [index, chord] of song.entries()) {
       if (chord.key !== key) {
         key = chord.key;
         signature = signatureOf(key);
         written = new Map<string, number>();
         text += `[K:${signature.name}]`;
       }
-      const midis = [...chord.notes, ...chord.soft]
-        .map(note2midi)
-        .filter(holds)
-        .sort((low, high) => low - high);
+      const midis = part(index);
       const spelled = (): string =>
         midis
           .map((midi) => {
