@@ -51,10 +51,10 @@ test("strikes holds a note shared by consecutive chords", () => {
 });
 
 test("toAbc splits notes between the staves and fills empty beats with rests", () => {
-  const abc = toAbc([chord(["C4", "E5"]), chord(["G3"])], 60);
+  const abc = toAbc([chord(["C4", "E4"]), chord(["G3"])], 60);
   expect(abc).toContain("Q:1/4=60");
   expect(abc).toContain("K:C");
-  expect(voice(abc, "1")).toBe("[Ce]2 z2 |]");
+  expect(voice(abc, "1")).toBe("[CE]2 z2 |]");
   expect(voice(abc, "2")).toBe("z2 [G,]2 |]");
 });
 
@@ -96,4 +96,10 @@ test("toAbc spells flat keys with flats and minor keys by name", () => {
   const abc = toAbc(song, 60);
   expect(abc).toContain("K:Cm");
   expect(voice(abc, "1")).toBe("[EB]2 |]");
+});
+
+test("toAbc moves notes below middle C to the treble staff when the left hand can't reach them", () => {
+  const abc = toAbc([chord(["C2", "B3", "E4"])], 60);
+  expect(voice(abc, "1")).toBe("[B,E]2 |]");
+  expect(voice(abc, "2")).toBe("[C,,]2 |]");
 });

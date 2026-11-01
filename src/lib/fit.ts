@@ -1,5 +1,6 @@
 /** module for fitting a song of raw chords to a key */
 
+import { playable } from "./hands";
 import { orderedNotes } from "./notes";
 import { pitchOffset, type RawNote } from "./raw";
 
@@ -347,6 +348,8 @@ function choices(notes: readonly RawNote[], options: FitOptions): Option[] {
           const midi = place(pitchClass, height + 12 * octave);
           const added = new Map(placed);
           added.set(midi, (added.get(midi) ?? 0) + weight);
+          // adding notes never makes a chord easier, so this prunes for good
+          if (!playable(added.keys())) continue;
           next.push({
             placed: added,
             cost: cost + weight * (moved + options.register * Math.abs(octave)),
@@ -589,9 +592,14 @@ function closing(
 function unfitted(song: readonly (readonly RawNote[])[]): FittedChord[] {
   return song.map((notes) => {
     const placed = new Map<number, number>();
-    for (const { note, height, weight } of notes) {
+    const heaviest = notes.toSorted(
+      (left, right) => right.weight - left.weight,
+    );
+    for (const { note, height, weight } of heaviest) {
       const midi = place(note, height);
-      placed.set(midi, (placed.get(midi) ?? 0) + weight);
+      if (playable([...placed.keys(), midi])) {
+        placed.set(midi, (placed.get(midi) ?? 0) + weight);
+      }
     }
     return { notes: byWeight(placed.entries()), key: null, triad: null };
   });
@@ -610,7 +618,9 @@ function byWeight(
  *
  * Each note may stay, move up to two semitones either way, move an octave
  * either way, or drop out; a chord is one such choice per note, read as the
- * triad of the key that holds the most of its weight. Dynamic programming
+ * triad of the key that holds the most of its weight. Only chords two hands
+ * can play are considered: each hand up to five notes within a ninth.
+ * Dynamic programming
  * over the song picks the chords, their triads and the key that together cost
  * least, where the cost is how far notes moved from their hues plus a penalty
  * for each musical preference in `options` that the result breaks:
@@ -632,7 +642,7 @@ function byWeight(
  * seventh in the triads on its fifth and seventh degrees, where the raised
  * note is then in key and is the leading note. With `"change"` the key may also
  * change once, to a nearby key, at the cost of `keyChange`. With `"off"` the
- * raw chords are returned.
+ * raw chords are returned, less the lightest notes two hands can't reach.
  *
  * ```ts
  * const chords = fit(song, { ...options, keyFit: "one" });

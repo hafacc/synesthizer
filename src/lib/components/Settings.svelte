@@ -253,7 +253,7 @@
         type="button"
         aria-label="More notes at once"
         onclick={() => {
-          maxNotes = Math.min(12, maxNotes + 1);
+          maxNotes = Math.min(10, maxNotes + 1);
         }}>+</button
       >
     </div>
