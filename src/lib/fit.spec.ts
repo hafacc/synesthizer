@@ -10,6 +10,7 @@ import {
   triadsOf,
   unresolved,
 } from "./fit";
+import { playable } from "./hands";
 import type { RawNote } from "./raw";
 
 const off: FitOptions = {
@@ -65,6 +66,21 @@ test("fitting off returns the raw notes near their heights", () => {
     { midi: 61, weight: 0.6 },
     { midi: 44, weight: 0.4 },
   ]);
+});
+
+test("fitting off drops the lightest notes two hands can't reach", () => {
+  const [first] = fit(
+    [[raw(0, 0.5, 0, 36), raw(4, 0.3, 0, 64), raw(7, 0.2, 0, 91)]],
+    { ...inKey, keyFit: "off" },
+  );
+  expect(first.notes.map(({ midi }) => midi)).toEqual([36, 64]);
+});
+
+test("every fitted chord can be played by two hands", () => {
+  const spread = [raw(0, 0.4, 0, 30), raw(4, 0.3, 0, 64), raw(7, 0.3, 0, 98)];
+  for (const { notes } of fit([...cadence, spread], { ...inKey, drop: 10 })) {
+    expect(playable(notes.map(({ midi }) => midi))).toBe(true);
+  }
 });
 
 test("a song already in a key is left alone and its key is found", () => {

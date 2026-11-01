@@ -2,6 +2,7 @@ import { v4 as uuid } from "uuid";
 import { type HSLC, hslc2rgb, rgb2hex, rgb2hslc } from "./colors";
 import { extract } from "./extraction";
 import { fit, keyName, place, sharpKey } from "./fit";
+import { playable } from "./hands";
 import { color2note, midi2note, note2midi } from "./notes";
 import { order } from "./order";
 import { lightness2height, type RawNote, summarize } from "./raw";
@@ -154,9 +155,14 @@ function* sounds(
     // black adds a quiet low note and white a quiet high one; mid grey adds
     // nothing
     const soft: string[] = [];
+    // quiet notes are only added where two hands can still play the chord
+    const fits = (name: string): boolean =>
+      !names.includes(name) &&
+      !soft.includes(name) &&
+      playable([...names, ...soft, name].map(note2midi));
     if (lead !== null && grey !== null && Math.abs(grey - 0.5) >= 0.2) {
       const name = midi2note(place(lead, lightness2height(grey)));
-      if (!names.includes(name)) {
+      if (fits(name)) {
         soft.push(name);
       }
     }
@@ -169,7 +175,7 @@ function* sounds(
           let midi = place(pitchClass, top - 6);
           while (midi < fillFloor) midi += 12;
           const name = midi2note(midi);
-          if (!soft.includes(name)) {
+          if (fits(name)) {
             soft.push(name);
           }
         }
